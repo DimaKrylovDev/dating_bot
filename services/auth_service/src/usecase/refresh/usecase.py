@@ -1,8 +1,8 @@
 import datetime
 
-from fastapi import HTTPException
 from jose import JWTError
 
+from src.domain.exceptions import InvalidRefreshTokenError, SessionExpiredError
 from src.persistance.unit_of_work import SQLAlchemyUnitOfWork
 from src.usecase.base import AuthBaseUsecase
 from src.usecase.refresh.request import RefreshRequest
@@ -17,16 +17,16 @@ class RefreshUsecase(AuthBaseUsecase):
         try:
             payload = self.decode_token(request.refresh_token)
         except JWTError:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            raise InvalidRefreshTokenError()
 
         session_id = payload.get("session_id")
         if not session_id:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            raise InvalidRefreshTokenError()
 
         async with self._uow as uow:
             session = await uow.sessions.get_by_id(session_id)
             if not session or not session.is_active:
-                raise HTTPException(status_code=401, detail="Session expired")
+                raise SessionExpiredError()
 
             await uow.sessions.update(
                 session.id,

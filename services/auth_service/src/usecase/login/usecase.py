@@ -1,7 +1,6 @@
 import datetime
 
-from fastapi import HTTPException
-
+from src.domain.exceptions import InvalidCredentialsError
 from src.persistance.unit_of_work import SQLAlchemyUnitOfWork
 from src.usecase.base import AuthBaseUsecase
 from src.usecase.login.request import LoginRequest
@@ -16,14 +15,14 @@ class LoginUsecase(AuthBaseUsecase):
         async with self._uow as uow:
             user = await uow.accounts.get_one_or_none(email=request.email)
             if not user:
-                raise HTTPException(status_code=401, detail="Invalid credentials")
+                raise InvalidCredentialsError()
 
             if not self.verify_password(request.password, user.password_hash):
-                raise HTTPException(status_code=401, detail="Invalid credentials")
+                raise InvalidCredentialsError()
 
             session = await uow.sessions.get_one_or_none(user_id=user.id)
             if not session:
-                raise HTTPException(status_code=401, detail="Invalid credentials")
+                raise InvalidCredentialsError()
 
             await uow.sessions.update(
                 session.id,

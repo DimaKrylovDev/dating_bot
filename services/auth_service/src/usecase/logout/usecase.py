@@ -1,7 +1,6 @@
 import datetime
 
-from fastapi import HTTPException
-
+from src.domain.exceptions import SessionNotFoundError
 from src.persistance.unit_of_work import SQLAlchemyUnitOfWork
 from src.usecase.base import AuthBaseUsecase
 from src.usecase.logout.request import LogoutRequest
@@ -16,7 +15,7 @@ class LogoutUsecase(AuthBaseUsecase):
         async with self._uow as uow:
             session = await uow.sessions.get_by_id(request.session_id)
             if not session:
-                raise HTTPException(status_code=404, detail="Session not found")
+                raise SessionNotFoundError()
 
             await uow.sessions.update(
                 session.id,

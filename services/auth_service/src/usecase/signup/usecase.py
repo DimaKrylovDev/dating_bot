@@ -1,8 +1,7 @@
 import uuid
 import datetime
 
-from fastapi import HTTPException
-
+from src.domain.exceptions import UserAlreadyExistsError
 from src.persistance.unit_of_work import SQLAlchemyUnitOfWork
 from src.usecase.base import AuthBaseUsecase
 from src.usecase.signup.request import SignUpRequest
@@ -17,7 +16,7 @@ class SignUpUsecase(AuthBaseUsecase):
         async with self._uow as uow:
             existing_user = await uow.accounts.get_one_or_none(email=request.email)
             if existing_user:
-                raise HTTPException(status_code=400, detail="User already exists")
+                raise UserAlreadyExistsError()
 
             hashed_password = self.hash_password(request.password)
 
