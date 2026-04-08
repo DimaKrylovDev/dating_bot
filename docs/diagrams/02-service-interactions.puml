@@ -1,0 +1,58 @@
+@startuml service-interactions
+!theme plain
+title Dating App — Синхронные вызовы между сервисами
+
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+skinparam padding 6
+skinparam nodesep 50
+skinparam ranksep 40
+
+' ===== СЕРВИСЫ =====
+component "API Gateway" as gw #fff3e0
+
+component "Auth Service\n:8001" as auth #e8f5e9
+component "User Service\n:8002" as user #e8f5e9
+component "Profile Service\n:8003" as profile #e8f5e9
+
+component "Matching Service\n:8004" as match #fce4ec
+component "Rating Service\n:8005" as rating #fce4ec
+component "Feed Service\n:8006" as discovery #fce4ec
+
+component "Chat Service\n:8007" as chat #e3f2fd
+component "Notification Service\n:8008" as notify #e3f2fd
+
+component "AI Service\n:8010" as ai #f3e5f5
+component "Image Processor" as imgproc #fff9c4
+
+' ===== GATEWAY → СЕРВИСЫ (HTTP) =====
+gw -down-> auth : <size:10>Авторизация\nкаждого запроса</size>
+gw -down-> user
+gw -down-> profile
+gw -down-> match
+gw -down-> discovery
+gw -down-> chat : <size:10>WS upgrade</size>
+gw -down-> rating
+gw -down-> ai
+
+' ===== МЕЖСЕРВИСНЫЕ ВЫЗОВЫ (HTTP/gRPC) =====
+note "Синхронные вызовы (HTTP)\nСервис → Сервис" as n1
+
+discovery -right-> profile : <size:10>GET профили\nпо списку ID</size>
+discovery -right-> rating : <size:10>GET рейтинги\nдля сортировки ленты</size>
+discovery --> user : <size:10>GET блокировки\n(исключить заблокированных)</size>
+
+match --> profile : <size:10>GET профиль\n(для валидации свайпа)</size>
+match --> user : <size:10>Проверка блокировок</size>
+
+chat --> match : <size:10>Проверка: есть ли\nактивный мэтч</size>
+chat --> user : <size:10>Проверка блокировок</size>
+
+ai --> profile : <size:10>GET данные профиля\nдля анализа</size>
+ai --> rating : <size:10>GET рейтинг\nдля рекомендаций</size>
+
+profile --> imgproc : <size:10>Загрузка фото\n→ ресайз → WebP</size>
+
+rating --> profile : <size:10>GET полнота профиля\n(profile_score)</size>
+
+@enduml

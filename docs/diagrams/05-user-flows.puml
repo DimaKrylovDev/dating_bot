@@ -1,0 +1,90 @@
+@startuml user-flow-swipe
+!theme plain
+title Dating App — Сценарий: Свайп → Мэтч → Чат
+
+actor "Пользователь A" as userA
+actor "Пользователь B" as userB
+
+participant "API Gateway" as gw
+participant "Feed\nService" as discovery
+participant "Matching\nService" as match
+participant "Kafka" as kafka
+participant "Rating\nService" as rating
+participant "Chat\nService" as chat
+participant "Notification\nService" as notify
+
+== 1. Пользователь A открывает ленту ==
+
+userA -> gw : GET /api/feed
+gw -> discovery : getFeed(userA)
+
+note right of discovery
+  1. Проверить кэш Redis
+  2. Если нет — запросить
+     Profile Service (анкеты)
+     + Rating Service (сортировка)
+     + User Service (исключить blocked)
+  3. Вернуть батч профилей
+end note
+
+discovery --> userA : [профиль B, профиль C, ...]
+
+== 2. Пользователь A свайпает LIKE на B ==
+
+userA -> gw : POST /api/matching/swipe\n{target: B, action: "like"}
+gw -> match : createSwipe(A → B, "like")
+
+note right of match
+  1. Записать swipe в БД
+  2. Проверить: есть ли
+     встречный лайк от B?
+  3. Если да → создать match
+end note
+
+match -> kafka : **swipe.created**
+match -> kafka : **match.created** (A ↔ B)
+
+== 3. Обработка события match.created ==
+
+kafka -> rating : match.created
+note right of rating
+  Обновить matches_count
+  и match_rate для A и B
+end note
+
+kafka -> chat : match.created
+note right of chat
+  Создать chat_room
+  для пары A ↔ B
+end note
+
+kafka -> notify : match.created
+notify -> userA : Push: "У вас мэтч с B!"
+notify -> userB : Push: "У вас мэтч с A!"
+
+== 4. Пользователь A пишет сообщение ==
+
+userA -> gw : WS: send_message\n{room: X, text: "Привет!"}
+gw -> chat : sendMessage(A, room, text)
+
+note right of chat
+  1. Проверить: есть ли
+     активный match
+  2. Сохранить в БД
+  3. Отправить через WS
+     пользователю B
+end note
+
+chat -> userB : WS: new_message
+chat -> kafka : **message.sent**
+
+kafka -> rating : message.sent
+note right of rating
+  Обновить messages_sent
+  и chat_initiation_rate
+end note
+
+kafka -> notify : message.sent
+notify -> userB : Push: "Новое сообщение от A"
+
+@enduml

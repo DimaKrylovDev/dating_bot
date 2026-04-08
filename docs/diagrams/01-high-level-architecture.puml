@@ -1,0 +1,126 @@
+@startuml high-level-architecture
+!theme plain
+title Dating App — Высокоуровневая архитектура
+
+skinparam defaultFontSize 12
+skinparam titleFontSize 18
+skinparam nodesep 60
+skinparam ranksep 50
+skinparam arrowThickness 2
+skinparam arrowFontSize 11
+skinparam rectangleBorderColor #555555
+skinparam databaseBorderColor #555555
+skinparam queueBorderColor #555555
+
+' ===================================================
+' СЛОЙ 1: КЛИЕНТ
+' ===================================================
+rectangle "Клиент" as client
+
+' ===================================================
+' СЛОЙ 2: API GATEWAY
+' ===================================================
+rectangle "API Gateway" as gw #FF77FF
+
+client -down-> gw : HTTPS
+
+' ===================================================
+' СЛОЙ 3: СЕРВИСЫ
+' ===================================================
+rectangle "Auth Service" as auth
+rectangle "User Service" as user
+rectangle "Profile Service" as profile
+rectangle "Interaction Service" as interaction
+
+gw -down-> auth : gRPC/REST
+gw -down-> user : gRPC/REST
+gw -down-> profile : gRPC/REST
+gw -down-> interaction : gRPC/REST
+
+' ===================================================
+' СЛОЙ 4: ХРАНИЛИЩА СЕРВИСОВ
+' ===================================================
+
+' Auth → Redis
+database "Redis:\nсессии, токены" as auth_redis
+auth -down-> auth_redis : read/write
+
+' User → PostgreSQL
+database "PostgreSQL:\nusers, referrals" as user_db
+auth -down-> user_db : read/write
+user -down-> user_db : read/write
+
+' Profile → PostgreSQL + MinIO
+database "PostgreSQL:\nprofiles, photos,\ninterests" as profile_db
+rectangle "MinIO S3" as minio #FF77FF
+profile -down-> profile_db : read/write
+profile -down-> minio : store images
+
+' Interaction → PostgreSQL + Kafka
+database "PostgreSQL:\nlikes, passes,\nmatches" as interaction_db
+queue "Apache Kafka" as kafka #FFFF77
+interaction -down-> interaction_db : read/write
+interaction -down-> kafka : publish events
+
+' ===================================================
+' СЛОЙ 5: DOWNSTREAM СЕРВИСЫ (из Kafka)
+' ===================================================
+rectangle "Match Service" as match_svc
+rectangle "Rating Service" as rating_svc
+rectangle "Notification Service" as notify_svc
+database "Redis" as cache_redis #77DDFF
+
+kafka -down-> match_svc : consume events
+kafka -down-> rating_svc : consume events
+kafka -down-> notify_svc : consume events
+
+' Match обращается к interaction за данными
+interaction -right-> match_svc : gRPC/REST
+
+' Rating
+database "PostgreSQL:\nratings,\nrating_history" as rating_db
+rating_svc -down-> rating_db : read/write
+match_svc -down-> rating_svc : fetch ratings
+
+' Rating → Celery
+rectangle "Celery + Beat" as celery #E8D0FF
+rating_svc -down-> celery : periodic recalc
+
+' Notification
+notify_svc -right-> cache_redis : cache
+rectangle "Email / Push" as email_push
+notify_svc -down-> email_push : send emails/push
+
+' ===================================================
+' AI / ML (отдельный блок)
+' ===================================================
+rectangle "AI Service" as ai
+database "Qdrant\n(Vector DB)" as qdrant
+database "PostgreSQL:\nai_analysis" as ai_db
+
+gw -down-> ai : gRPC/REST
+ai -down-> qdrant : embeddings
+ai -down-> ai_db : read/write
+ai -left-> profile_db : данные профиля
+
+' ===================================================
+' Feed Service
+' ===================================================
+rectangle "Feed Service" as feed
+gw -down-> feed : gRPC/REST
+feed -down-> rating_svc : fetch ratings
+feed -left-> profile_db : профили
+feed -down-> cache_redis : кэш ленты
+
+' ===================================================
+' Chat Service
+' ===================================================
+rectangle "Chat Service" as chat
+database "PostgreSQL:\nmessages" as chat_db
+
+gw -down-> chat : gRPC/REST
+chat -down-> chat_db : read/write
+chat -down-> cache_redis : онлайн, typing
+chat -down-> kafka : message events
+
+@enduml

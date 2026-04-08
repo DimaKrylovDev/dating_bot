@@ -1,0 +1,139 @@
+@startuml overview
+!theme plain
+title Dating App — Обзорная архитектура (сервисы, БД, связи)
+
+skinparam componentStyle rectangle
+skinparam defaultFontSize 12
+skinparam titleFontSize 18
+skinparam padding 8
+skinparam nodesep 50
+skinparam ranksep 50
+skinparam arrowThickness 2
+skinparam arrowFontSize 10
+skinparam databaseBackgroundColor #2d2d2d
+skinparam databaseFontColor #ffffff
+
+' ===================================================
+' КЛИЕНТ
+' ===================================================
+actor "Клиент\n(Mobile / Telegram)" as client
+
+' ===================================================
+' API GATEWAY
+' ===================================================
+component "API Gateway\n(Nginx)" as gw #FF69B4
+
+client -down-> gw : HTTPS
+
+' ===================================================
+' ОСНОВНЫЕ СЕРВИСЫ (верхний ряд)
+' ===================================================
+component "Auth Service\n:8001" as auth #e8f5e9
+component "User Service\n:8002" as user #e8f5e9
+component "Profile Service\n:8003" as profile #e8f5e9
+component "Matching Service\n:8004" as match #fce4ec
+component "Feed Service\n:8006" as feed #fce4ec
+
+gw -down-> auth : gRPC/REST
+gw -down-> user : gRPC/REST
+gw -down-> profile : gRPC/REST
+gw -down-> match : gRPC/REST
+gw -down-> feed : gRPC/REST
+
+' ===================================================
+' БАЗЫ ДАННЫХ (PostgreSQL per service)
+' ===================================================
+database "PostgreSQL:\naccounts" as db_auth
+database "PostgreSQL:\nusers, referrals,\nblocks, reports" as db_user
+database "PostgreSQL:\nprofiles, photos,\ninterests (PostGIS)" as db_profile
+database "PostgreSQL:\nswipes, matches,\npending_likes" as db_match
+database "PostgreSQL:\nratings,\nrating_history" as db_rating
+
+auth -down-> db_auth : read/write
+user -down-> db_user : read/write
+profile -down-> db_profile : read/write
+match -down-> db_match : read/write
+
+' ===================================================
+' MEDIA
+' ===================================================
+database "MinIO (S3)" as minio #EE82EE
+
+profile -down-> minio : store images
+
+' ===================================================
+' KAFKA
+' ===================================================
+queue "Apache Kafka" as kafka #FFD700
+
+match -down-> kafka : publish events
+feed -down-> kafka : consume events
+
+' ===================================================
+' ВТОРИЧНЫЕ СЕРВИСЫ (нижний ряд)
+' ===================================================
+component "Rating Service\n:8005" as rating #fce4ec
+component "Chat Service\n:8007" as chat #e3f2fd
+component "Notification Service\n:8008" as notify #e3f2fd
+component "AI Service\n:8010" as ai #f3e5f5
+
+kafka -down-> rating : consume events
+kafka -down-> notify : consume events
+kafka -down-> chat : consume events
+
+' ===================================================
+' СВЯЗИ МЕЖДУ СЕРВИСАМИ
+' ===================================================
+feed -right-> profile : профили для ленты
+feed -right-> rating : рейтинги для сортировки
+match -left-> user : проверка блокировок
+chat -up-> match : проверка мэтча
+
+' ===================================================
+' БД И ХРАНИЛИЩА ВТОРИЧНЫХ СЕРВИСОВ
+' ===================================================
+rating -down-> db_rating : read/write
+
+database "PostgreSQL:\nchat_rooms,\nmessages" as db_chat
+chat -down-> db_chat : read/write
+
+database "PostgreSQL:\nai_analyses,\nrecommendations" as db_ai
+ai -down-> db_ai : read/write
+
+' ===================================================
+' REDIS
+' ===================================================
+database "Redis" as redis #87CEEB
+
+auth -down-> redis : sessions
+feed -down-> redis : cache ленты
+chat -down-> redis : online, typing
+rating -down-> redis : cache рейтингов
+
+' ===================================================
+' QDRANT
+' ===================================================
+database "Qdrant\n(Vector DB)" as qdrant #DDA0DD
+
+ai -down-> qdrant : embeddings
+
+' ===================================================
+' NOTIFICATION ВЫХОДЫ
+' ===================================================
+component "Email / Push" as email_push
+notify -down-> email_push : send emails/push
+
+' ===================================================
+' CELERY
+' ===================================================
+component "Celery + Beat" as celery #DDA0DD
+
+rating -down-> celery : periodic recalc
+ai -down-> celery : async tasks
+
+' ===================================================
+' AI связи
+' ===================================================
+ai -up-> profile : fetch профилей
+
+@enduml

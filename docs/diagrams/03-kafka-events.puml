@@ -1,0 +1,69 @@
+@startuml kafka-events
+!theme plain
+title Dating App — Асинхронные события (Kafka)
+
+skinparam defaultFontSize 11
+skinparam nodesep 40
+skinparam ranksep 30
+
+legend top left
+  **Producer** ══> [Topic] ══> **Consumer**
+  Каждый топик — отдельный Kafka topic.
+  Сервисы могут быть и producer, и consumer.
+end legend
+
+' ===== PRODUCERS (слева) =====
+component "Auth Service" as auth #c8e6c9
+component "Profile Service" as profile #c8e6c9
+component "User Service" as user_svc #c8e6c9
+component "Matching Service" as match #ffcdd2
+component "Chat Service" as chat #bbdefb
+component "Rating Service" as rating #ffcdd2
+
+' ===== KAFKA TOPICS =====
+queue "user.events" as t_user #eceff1
+queue "match.events" as t_match #eceff1
+queue "chat.events" as t_chat #eceff1
+queue "rating.events" as t_rating #eceff1
+queue "notification.events" as t_notify #eceff1
+
+' ===== CONSUMERS (справа) =====
+component "Rating Service\n(consumer)" as rating_c #ffcdd2
+component "Feed Service\n(consumer)" as discovery_c #ffcdd2
+component "Notification Service\n(consumer)" as notify_c #bbdefb
+component "AI Service\n(consumer)" as ai_c #e1bee7
+component "Chat Service\n(consumer)" as chat_c #bbdefb
+
+' ===== PUBLISH =====
+auth --> t_user : user.registered
+profile --> t_user : profile.updated\nprofile.photo_uploaded
+user_svc --> t_user : referral.created
+
+match --> t_match : swipe.created\nmatch.created\nunmatch
+
+chat --> t_chat : message.sent\nchat.initiated
+
+rating --> t_rating : rating.updated\nrating.recalculated
+
+match --> t_notify : match.created\nsuper_like.received
+chat --> t_notify : message.sent
+rating --> t_notify : rating.milestone
+
+' ===== CONSUME =====
+t_user --> rating_c : → пересчитать profile_score\n→ начислить реферальный бонус
+t_user --> discovery_c : → инвалидировать кэш ленты
+t_user --> ai_c : → запустить анализ профиля
+
+t_match --> rating_c : → обновить match_rate,\n  like_ratio
+t_match --> notify_c : → push "It's a match!"
+t_match --> chat_c : → создать chat_room
+t_match --> ai_c : → сгенерировать\n  conversation starters
+
+t_chat --> rating_c : → обновить\n  chat_initiation_rate
+t_chat --> notify_c : → push "Новое сообщение"
+
+t_rating --> discovery_c : → пересортировка ленты
+
+t_notify --> notify_c : → отправить push/email/sms
+
+@enduml

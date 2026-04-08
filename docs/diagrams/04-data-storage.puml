@@ -1,0 +1,68 @@
+@startuml data-storage
+!theme plain
+title Dating App — Хранилища данных и что в них хранится
+
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+skinparam padding 6
+skinparam nodesep 40
+skinparam ranksep 35
+
+' ===== СЕРВИСЫ =====
+component "Auth Service" as auth #e8f5e9
+component "User Service" as user #e8f5e9
+component "Profile Service" as profile #e8f5e9
+component "Matching Service" as match #fce4ec
+component "Rating Service" as rating #fce4ec
+component "Feed Service" as discovery #fce4ec
+component "Chat Service" as chat #e3f2fd
+component "AI Service" as ai #f3e5f5
+component "Image Processor" as imgproc #fff9c4
+
+' ===== POSTGRESQL (отдельные БД) =====
+package "PostgreSQL (DB-per-service)" as pg_cluster #e0e0e0 {
+    database "auth_db\n——\naccounts" as auth_db
+    database "user_db\n——\nusers\nreferral_bonuses\nuser_blocks\nreports" as user_db
+    database "profile_db\n——\nprofiles (+ PostGIS)\nphotos\ninterests\nsearch_preferences" as profile_db
+    database "matching_db\n——\nswipes\nmatches\npending_likes\ndaily_limits" as match_db
+    database "rating_db\n——\nuser_ratings\nrating_history\nrating_stats_daily" as rating_db
+    database "chat_db\n——\nchat_rooms\nmessages\nread_receipts" as chat_db
+    database "ai_db\n——\nprofile_analyses\nrecommendations\nconversation_starters\nai_requests\nai_feedback" as ai_db
+}
+
+' ===== REDIS =====
+database "Redis Cluster" as redis #ffcdd2 {
+    storage "sessions & tokens" as r_sess
+    storage "feed cache\n(просмотренные, лента)" as r_disc
+    storage "online statuses\n& typing indicators" as r_chat
+    storage "rating cache" as r_rate
+}
+
+' ===== QDRANT =====
+database "Qdrant (Vector DB)\n——\nprofiles collection\n1536-dim embeddings\nCosine similarity" as qdrant #e1bee7
+
+' ===== MINIO =====
+database "MinIO (S3)\n——\nОригиналы фото\nТамбнейлы\nWebP-версии" as minio #fff9c4
+
+' ===== СВЯЗИ: Сервисы → PostgreSQL =====
+auth --> auth_db
+user --> user_db
+profile --> profile_db
+match --> match_db
+rating --> rating_db
+chat --> chat_db
+ai --> ai_db
+
+' ===== СВЯЗИ: Сервисы → Redis =====
+auth --> r_sess : <size:10>JWT refresh tokens\nсессии</size>
+discovery --> r_disc : <size:10>Кэш ленты\nset просмотренных</size>
+chat --> r_chat : <size:10>Кто онлайн\ntyping status</size>
+rating --> r_rate : <size:10>Кэш рейтингов\n(hot data)</size>
+
+' ===== СВЯЗИ: AI → Qdrant =====
+ai --> qdrant : <size:10>Запись/поиск\nembeddings профилей</size>
+
+' ===== СВЯЗИ: Media → MinIO =====
+imgproc --> minio : <size:10>Сохранение\nобработанных фото</size>
+
+@enduml

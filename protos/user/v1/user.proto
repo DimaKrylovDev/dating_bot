@@ -1,0 +1,152 @@
+syntax = "proto3";
+
+package user.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service UserService {
+  // settings
+  rpc GetUserSettings(GetUserSettingsRequest) returns (UserSettings);
+  rpc UpdateUserSettings(UpdateUserSettingsRequest) returns (UserSettings);
+
+  // status
+  rpc GetUserStatus(UserIdRequest) returns (UserStatus);
+  rpc UpdateUserStatus(UpdateUserStatusRequest) returns (UserStatus);
+
+  // referral
+  rpc GenerateReferralCode(UserIdRequest) returns (ReferralCode);
+  rpc ApplyReferralCode(ApplyReferralCodeRequest) returns (ReferralApplyResult);
+
+  // premium
+  rpc CheckPremium(UserIdRequest) returns (PremiumStatus);
+  rpc ActivatePremium(ActivatePremiumRequest) returns (PremiumStatus);
+  rpc DeactivatePremium(UserIdRequest) returns (PremiumStatus);
+
+  // blocks
+  rpc BlockUser(BlockPairRequest) returns (UserBlock);
+  rpc UnblockUser(BlockPairRequest) returns (google.protobuf.Empty);
+  rpc IsBlocked(BlockPairRequest) returns (IsBlockedResponse);
+  rpc ListBlocked(UserIdRequest) returns (ListBlockedResponse);
+
+  // ban
+  rpc BanUser(BanUserRequest) returns (UserStatus);
+}
+
+// common
+
+message UserIdRequest {
+  string user_id = 1;
+}
+
+// settings
+
+message GetUserSettingsRequest {
+  string user_id = 1;
+}
+
+message UpdateUserSettingsRequest {
+  string user_id = 1;
+  optional string language = 2;
+  optional bool show_online_status = 3;
+  optional bool show_distance = 4;
+  optional bool show_age = 5;
+  optional bool discoverable = 6;
+  optional bool push_enabled = 7;
+  optional bool email_enabled = 8;
+}
+
+message UserSettings {
+  string id = 1;
+  string user_id = 2;
+  string language = 3;
+  bool show_online_status = 4;
+  bool show_distance = 5;
+  bool show_age = 6;
+  bool discoverable = 7;
+  bool push_enabled = 8;
+  bool email_enabled = 9;
+}
+
+// status
+
+enum UserStatusValue {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ACTIVE = 1;
+  USER_STATUS_BANNED = 2;
+  USER_STATUS_DELETED = 3;
+}
+
+message UpdateUserStatusRequest {
+  string user_id = 1;
+  UserStatusValue status = 2;
+  optional string reason = 3;
+}
+
+message UserStatus {
+  string id = 1;
+  UserStatusValue status = 2;
+  optional string ban_reason = 3;
+  optional google.protobuf.Timestamp banned_at = 4;
+  optional google.protobuf.Timestamp deleted_at = 5;
+}
+
+// referral
+
+message ReferralCode {
+  string user_id = 1;
+  string code = 2;
+}
+
+message ApplyReferralCodeRequest {
+  string user_id = 1;
+  string code = 2;
+}
+
+message ReferralApplyResult {
+  string user_id = 1;
+  string referrer_id = 2;
+  int32 premium_days_granted = 3;
+  int32 super_likes_granted = 4;
+}
+
+// premium
+
+message ActivatePremiumRequest {
+  string user_id = 1;
+  int32 days = 2;
+}
+
+message PremiumStatus {
+  string id = 1;
+  bool is_premium = 2;
+  optional google.protobuf.Timestamp premium_until = 3;
+}
+
+// blocks
+
+message BlockPairRequest {
+  string blocker_id = 1;
+  string blocked_id = 2;
+}
+
+message UserBlock {
+  string id = 1;
+  string blocker_id = 2;
+  string blocked_id = 3;
+}
+
+message IsBlockedResponse {
+  bool is_blocked = 1;
+}
+
+message ListBlockedResponse {
+  repeated string blocked_ids = 1;
+}
+
+// ban
+
+message BanUserRequest {
+  string user_id = 1;
+  string reason = 2;
+}

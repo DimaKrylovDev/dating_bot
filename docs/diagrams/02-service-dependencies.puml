@@ -1,0 +1,95 @@
+@startuml service-dependencies
+!theme plain
+title Dating App — Зависимости между сервисами (кто кого вызывает)
+
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+skinparam nodesep 50
+skinparam ranksep 40
+
+legend top left
+  **Типы связей:**
+  ——→  Синхронный вызов (HTTP/gRPC)
+  - - → Асинхронное событие (Kafka)
+end legend
+
+' ===== СЕРВИСЫ =====
+component "API Gateway" as gw #fff3e0
+
+component "Auth Service\n:8001" as auth #c8e6c9
+component "User Service\n:8002" as user #c8e6c9
+component "Profile Service\n:8003" as profile #c8e6c9
+
+component "Matching Service\n:8004" as match #ffcdd2
+component "Rating Service\n:8005" as rating #ffcdd2
+component "Feed Service\n:8006" as discovery #ffcdd2
+
+component "Chat Service\n:8007" as chat #bbdefb
+component "Notification Service\n:8008" as notify #bbdefb
+
+component "AI Service\n:8010" as ai #e1bee7
+
+component "Image Processor" as imgproc #fff9c4
+
+' ===== СИНХРОННЫЕ ВЫЗОВЫ =====
+
+' Gateway маршрутизирует
+gw --> auth : Аутентификация\n(каждый запрос)
+gw --> user
+gw --> profile
+gw --> match
+gw --> discovery
+gw --> chat
+gw --> ai
+gw --> rating
+
+' Matching обращается к Profile для получения данных анкет
+match --> profile : Получить профиль\n(при свайпе)
+match --> user : Проверить блокировки
+
+' Feed нужны профили и рейтинги
+discovery --> profile : Профили по фильтрам\n(пол, возраст, гео)
+discovery --> rating : Получить рейтинги\nдля сортировки
+discovery --> user : Проверить блокировки\nи подписку
+
+' Chat обращается к Matching для проверки
+chat --> match : Проверить наличие\nактивного мэтча
+chat --> user : Проверить подписку\n(фото в чате, receipts)
+
+' Rating считает на основе данных
+rating --> profile : Полнота профиля\n(completion_score)
+rating --> match : Статистика свайпов\nи мэтчей
+rating --> chat : Активность в чатах
+
+' AI анализирует профиль
+ai --> profile : Фото, bio, интересы
+ai --> rating : Текущий рейтинг
+
+' Profile загружает фото
+profile --> imgproc : Загрузка и обработка\nфотографий
+
+' Notification отправляет по данным пользователя
+notify --> user : Контакты, настройки\nуведомлений
+
+' ===== АСИНХРОННЫЕ СОБЫТИЯ (Kafka) =====
+
+auth ..> user : user.registered
+auth ..> rating : user.registered\n→ создать запись рейтинга
+
+profile ..> ai : profile.updated\n→ запустить анализ
+profile ..> rating : profile.updated\n→ пересчитать profile_score
+profile ..> discovery : profile.updated\n→ инвалидировать кэш
+
+match ..> chat : match.created\n→ создать чат-комнату
+match ..> notify : match.created\n→ push обоим
+match ..> rating : swipe.created\n→ обновить behavioral
+match ..> ai : match.created\n→ сгенерировать starters
+
+chat ..> notify : message.sent\n→ push получателю
+chat ..> rating : message.sent\n→ обновить chat_rate
+
+rating ..> discovery : rating.updated\n→ пересортировка ленты
+
+user ..> rating : referral.created\n→ реферальный бонус
+
+@enduml
