@@ -1,0 +1,2 @@
+broker,tag,target_rate,size,duration_s,producers,consumers,produce_elapsed_s,total_elapsed_s,sent,received,lost_or_backlog,final_backlog,send_errors,recv_errors,send_rate_msg_s,recv_rate_msg_s,avg_latency_ms,p50_latency_ms,p95_latency_ms,p99_latency_ms,max_latency_ms
+rabbitmq,smoke,1000,1024,10.0,1,1,10.0,10.507,10000,10000,0,0,0,0,1000.0,951.8,2.05,0.43,12.37,41.13,51.48
