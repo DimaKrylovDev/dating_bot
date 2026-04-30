@@ -1,0 +1,2 @@
+label,strategy,read_ratio,workers,duration_target_s,duration_actual_s,ops,reads,writes,throughput_rps,avg_latency_ms,p50_ms,p95_ms,p99_ms,db_reads,db_writes,cache_hits,cache_misses,cache_sets,hit_rate,wb_max_queue,wb_flush_batches,wb_flush_rows,wb_pending_at_end,stop_drain_s
+read_heavy,write_back,0.8,16,20.0,20.016,305613,244693,60920,15268.6,1.044,0.797,2.705,4.242,821,54556,243872,821,61741,0.9966,56481,273,54556,0,2.261
